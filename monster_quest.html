@@ -90,6 +90,13 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:1px;}
 #moves.show{display:grid;}
 #moves button{font-size:11px;}
 #moves small{display:block;color:#7a7460;font-size:9px;}
+/* 선택형 패널은 항상 메시지 박스 위에 표시 */
+#actions,#moves,#party,#bag,#pause,#saveui{z-index:8;}
+/* 커맨드 선택 중에는 메시지를 왼쪽으로 좁혀 나란히 배치 */
+#msg.beside{right:59%;}
+#msg.beside .arrow{display:none;}
+/* 키보드 포커스 표시 */
+button.kfocus{background:#ffe9b3;outline:3px solid var(--accent);outline-offset:-1px;}
 /* 리스트형 패널(파티/가방/메뉴) */
 .list{left:6%;right:6%;top:6%;max-height:88%;overflow:auto;padding:8px;}
 .list h3{font-size:12px;margin:2px 0 8px;color:var(--accent-dk);}
@@ -517,11 +524,48 @@ function pressA(){ const w=aWaiters; aWaiters=[]; w.forEach(f=>f()); }
 function waitA(){ return new Promise(res=>aWaiters.push(res)); }
 let bHandler=null, startHandler=null;
 
+/* 한국어 조사 자동 선택: josa('불꼬리','은','는') -> '는' */
+function josa(w,a,b){
+  w=String(w);
+  let c=w.charCodeAt(w.length-1);
+  if(c>=48&&c<=57) c='영일이삼사오육칠팔구'.charCodeAt(c-48); // 숫자는 읽는 소리 기준
+  if(c<0xAC00||c>0xD7A3) return a+'('+b+')';
+  return ((c-0xAC00)%28)?a:b;
+}
+
+/* 메뉴 키보드 내비게이션 (방향키 + Z/Enter) */
+const NAV_PANELS=['actions','moves','party','bag','pause','saveui'];
+function visibleMenu(){
+  for(const id of NAV_PANELS){ const el=$(id); if(el&&el.classList.contains('show')) return el; }
+  return null;
+}
+function menuNav(dir){
+  const el=visibleMenu(); if(!el) return false;
+  const btns=[...el.querySelectorAll('button')];
+  if(!btns.length) return true;
+  let i=btns.findIndex(x=>x.classList.contains('kfocus'));
+  const cols=(el.id==='actions'||el.id==='moves')?2:1;
+  if(i<0) i=0;
+  else{
+    if(dir==='left')i--; if(dir==='right')i++;
+    if(dir==='up')i-=cols; if(dir==='down')i+=cols;
+    i=Math.max(0,Math.min(btns.length-1,i));
+  }
+  btns.forEach((x,j)=>x.classList.toggle('kfocus',j===i));
+  btns[i].scrollIntoView({block:'nearest'});
+  beep(660,.04,'square',.02);
+  return true;
+}
+
 const KEYMAP = {ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',
   w:'up',s:'down',a:'left',d:'right',W:'up',S:'down',A:'left',D:'right'};
 addEventListener('keydown',e=>{
   if(e.repeat) return;
-  if(KEYMAP[e.key]){ held[KEYMAP[e.key]]=true; e.preventDefault(); }
+  if(KEYMAP[e.key]){
+    e.preventDefault();
+    if(menuNav(KEYMAP[e.key])) return; // 메뉴가 열려 있으면 커서 이동
+    held[KEYMAP[e.key]]=true;
+  }
   else if(e.key==='z'||e.key==='Z'||e.key==='Enter'||e.key===' '){ onA(); e.preventDefault(); }
   else if(e.key==='x'||e.key==='X'||e.key==='Escape'){ onB(); }
   else if(e.key==='Shift'){ onStart(); }
@@ -540,6 +584,11 @@ document.getElementById('bStart').addEventListener('click',()=>onStart());
 document.getElementById('msg').addEventListener('pointerdown',()=>pressA());
 
 function onA(){
+  const m=visibleMenu();
+  if(m){
+    const f=m.querySelector('button.kfocus')||m.querySelector('button');
+    if(f){ f.click(); return; }
+  }
   if(aWaiters.length){ pressA(); return; }
   if(G.state==='world') interact();
 }
@@ -823,10 +872,11 @@ function pickAction(){ // 배틀 커맨드 선택
     const A=$('actions'); A.innerHTML='';
     [['fight','⚔ 싸우다'],['bag','🎒 가방'],['party','📦 교체'],['run','🏃 도망']].forEach(([k,label])=>{
       const b=document.createElement('button'); b.textContent=label;
-      b.onclick=()=>{ sfx.ok(); A.classList.remove('show'); res(k); };
+      b.onclick=()=>{ sfx.ok(); A.classList.remove('show'); $('msg').classList.remove('beside'); res(k); };
       A.appendChild(b);
     });
-    show('msg'); $('msgText').textContent=`${nameOf(B.ally)}은(는) 어떻게 할까?`;
+    show('msg'); $('msgText').textContent=`${nameOf(B.ally)}${josa(nameOf(B.ally),'은','는')} 어떻게 할까?`;
+    $('msg').classList.add('beside');
     A.classList.add('show');
     bHandler=null;
   });
@@ -894,7 +944,7 @@ function bagRowsBattle(){
 async function throwCapsule(kind){
   G.bag[kind]--;
   sfx.throwB();
-  await sayNoWait(`${ITEMS[kind].name}을(를) 던졌다!`);
+  await sayNoWait(`${josa(ITEMS[kind].name,'을','를')} 던졌다!`);
   for(let y=120;y>50;y-=6){ B.anim.ballY=y; await sleep(24); }
   B.anim.eVisible=false; B.anim.ballY=58; await sleep(350);
   const hpFrac=B.foe.hp/B.foe.maxHp;
@@ -909,8 +959,8 @@ async function throwCapsule(kind){
   await sleep(400);
   if(shakes===3){
     sfx.catchOk(); B.anim.ballY=-1;
-    await say(`신난다! ${nameOf(B.foe)}을(를) 잡았다!`);
-    if(G.party.length<6){ G.party.push(B.foe); await say(`${nameOf(B.foe)}이(가) 파티에 합류했다!`); }
+    await say(`신난다! ${josa(nameOf(B.foe),'을','를')} 잡았다!`);
+    if(G.party.length<6){ G.party.push(B.foe); await say(`${josa(nameOf(B.foe),'이','가')} 파티에 합류했다!`); }
     else await say('파티가 가득 차서… 몬스터가 야생으로 돌아갔다. (최대 6마리)');
     return true;
   }
@@ -924,7 +974,7 @@ async function sayNoWait(text){ show('msg'); $('msgText').textContent=text; awai
 async function gainExp(){
   const amt=Math.floor(DEX[B.foe.id].exp*B.foe.lv/6)+1;
   B.ally.exp+=amt; refreshBoxes();
-  await say(`${nameOf(B.ally)}은(는) 경험치 ${amt}을(를) 얻었다!`);
+  await say(`${josa(nameOf(B.ally),'은','는')} 경험치 ${josa(amt,'을','를')} 얻었다!`);
   while(B.ally.exp>=expToNext(B.ally.lv)){
     B.ally.exp-=expToNext(B.ally.lv); B.ally.lv++;
     const oldMax=B.ally.maxHp; calcStats(B.ally); B.ally.hp+=B.ally.maxHp-oldMax;
@@ -933,8 +983,8 @@ async function gainExp(){
     for(const [l,mv] of DEX[B.ally.id].learn){
       if(l===B.ally.lv){
         const r=addMove(B.ally,mv);
-        if(r==='new') await say(`${mv}을(를) 배웠다!`);
-        else if(r) await say(`${r}을(를) 잊고 ${mv}을(를) 배웠다!`);
+        if(r==='new') await say(`${josa(mv,'을','를')} 배웠다!`);
+        else if(r) await say(`${josa(r,'을','를')} 잊고 ${josa(mv,'을','를')} 배웠다!`);
       }
     }
   }
@@ -946,7 +996,7 @@ async function startBattle(foe){
   B.foe=foe; B.ally=aliveParty()[0];
   B.anim={eShake:0,pShake:0,eFlash:0,pFlash:0,ballY:-1,eVisible:true};
   refreshBoxes(); show('ebox'); show('pbox');
-  await say(`앗! 야생의 ${nameOf(foe)}이(가) 나타났다!`);
+  await say(`앗! 야생의 ${josa(nameOf(foe),'이','가')} 나타났다!`);
   await say(`가라! ${nameOf(B.ally)}!`);
 
   battleLoop:
@@ -996,7 +1046,7 @@ async function startBattle(foe){
         await doMove(B.ally,B.foe,mv,true);
         if(B.foe.hp<=0){
           sfx.faint(); B.anim.eVisible=false;
-          await say(`야생 ${nameOf(B.foe)}이(가) 쓰러졌다!`);
+          await say(`야생 ${josa(nameOf(B.foe),'이','가')} 쓰러졌다!`);
           await gainExp();
           break battleLoop;
         }
@@ -1004,7 +1054,7 @@ async function startBattle(foe){
         await doMove(B.foe,B.ally,mv,false);
         if(B.ally.hp<=0){
           sfx.faint(); refreshBoxes();
-          await say(`${nameOf(B.ally)}이(가) 쓰러졌다!`);
+          await say(`${josa(nameOf(B.ally),'이','가')} 쓰러졌다!`);
           if(aliveParty().length===0){
             await say('눈앞이 캄캄해졌다…');
             await blackout(); break battleLoop;
@@ -1020,7 +1070,7 @@ async function startBattle(foe){
   endBattle();
 }
 function endBattle(){
-  hide('ebox'); hide('pbox'); hide('msg'); $('actions').classList.remove('show'); $('moves').classList.remove('show');
+  hide('ebox'); hide('pbox'); hide('msg'); $('actions').classList.remove('show'); $('moves').classList.remove('show'); $('msg').classList.remove('beside');
   bHandler=null;
   if(G.state!=='title') G.state='world';
 }
@@ -1157,7 +1207,7 @@ function pickStarter(){
     b.onclick=async()=>{
       sfx.catchOk(); hide('starter');
       G.party=[makeMon(id,5)];
-      await dialog([`${DEX[id].name}을(를) 선택했다!`,
+      await dialog([`${josa(DEX[id].name,'을','를')} 선택했다!`,
                     DEX[id].desc,
                     '박사: 좋은 선택이야! 캡슐 8개와 회복약 4개도 챙기게.',
                     '북쪽 풀숲에 다양한 몬스터가 산다네.',
