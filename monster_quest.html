@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>몬스터 퀘스트: 새싹 마을</title>
+<style>
+@font-face{
+  font-family:'DGM';
+  src:url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/DungGeunMo.woff') format('woff');
+  font-display:swap;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none;}
+:root{
+  --shell:#e8e4d8; --shell-dk:#c9c4b2; --shell-line:#9a957f;
+  --screen-bezel:#3a3f36; --accent:#d9534a; --accent-dk:#a93c35;
+  --btn:#5b5f6e; --ink:#2a2d26;
+  --uibg:#f8f4e3; --uiborder:#3a3f36;
+}
+html,body{height:100%;}
+body{
+  background:#22281f;
+  background-image:radial-gradient(circle at 50% 30%, #2f3829 0%, #1b2017 70%);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'DGM','Galmuri11',Pretendard,'Apple SD Gothic Neo',sans-serif;
+  color:var(--ink);
+  min-height:100dvh; padding:10px;
+}
+#console{
+  width:min(96vw,460px);
+  background:linear-gradient(160deg,#f1ede1,var(--shell) 40%,var(--shell-dk));
+  border:3px solid var(--shell-line);
+  border-radius:18px 18px 44px 18px;
+  box-shadow:0 18px 40px rgba(0,0,0,.55), inset 0 2px 0 rgba(255,255,255,.6);
+  padding:14px 14px 18px;
+}
+#topbar{display:flex;align-items:center;justify-content:space-between;padding:0 4px 8px;}
+#brand{font-size:11px;letter-spacing:2px;color:#6d6852;}
+#powerled{width:9px;height:9px;border-radius:50%;background:#e23b30;box-shadow:0 0 8px #e23b30;}
+#screenwrap{
+  position:relative;
+  background:var(--screen-bezel);
+  border-radius:10px;
+  padding:12px;
+  box-shadow:inset 0 3px 8px rgba(0,0,0,.6);
+}
+#stage{position:relative;width:100%;aspect-ratio:160/144;background:#0c0f0a;overflow:hidden;border-radius:3px;}
+canvas#game{
+  position:absolute;inset:0;width:100%;height:100%;
+  image-rendering:pixelated;image-rendering:crisp-edges;
+}
+/* ---------- 공통 UI 오버레이 ---------- */
+.panel{position:absolute;display:none;z-index:5;}
+.panel.show{display:block;}
+.win{
+  background:var(--uibg);
+  border:3px solid var(--uiborder);
+  border-radius:6px;
+  box-shadow:inset 0 0 0 2px #fff, 3px 3px 0 rgba(0,0,0,.35);
+}
+button{
+  font-family:inherit;font-size:13px;color:var(--ink);
+  background:var(--uibg);border:2px solid var(--uiborder);border-radius:5px;
+  padding:7px 8px;cursor:pointer;box-shadow:inset 0 0 0 1px #fff;
+  text-align:left;
+}
+button:active{transform:translate(1px,1px);}
+button.sel{background:#ffe9b3;}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:1px;}
+/* 메시지 박스 */
+#msg{left:2%;right:2%;bottom:2%;padding:8px 10px;min-height:23%;font-size:13px;line-height:1.55;cursor:pointer;}
+#msg .arrow{position:absolute;right:9px;bottom:5px;animation:bob .6s infinite alternate;font-size:12px;}
+@keyframes bob{from{transform:translateY(0)}to{transform:translateY(3px)}}
+/* 배틀 HP 박스 */
+.hpbox{padding:5px 8px 7px;font-size:11px;width:46%;}
+#ebox{top:3%;left:2%;}
+#pbox{bottom:27%;right:2%;}
+.hpbox .nm{display:flex;justify-content:space-between;gap:4px;}
+.hpbar{height:6px;background:#cfc8ae;border:1px solid var(--uiborder);border-radius:3px;margin-top:4px;overflow:hidden;}
+.hpbar i{display:block;height:100%;width:100%;background:#43b34a;transition:width .45s;}
+.hpbar i.mid{background:#e6a23c}.hpbar i.low{background:#d9534a}
+.hpnum{text-align:right;font-size:10px;margin-top:2px;}
+.xpbar{height:4px;background:#cfc8ae;border:1px solid var(--uiborder);border-radius:2px;margin-top:3px;overflow:hidden;}
+.xpbar i{display:block;height:100%;background:#4a90d9;transition:width .4s;}
+/* 배틀 커맨드 */
+#actions{right:2%;bottom:2%;width:55%;display:none;grid-template-columns:1fr 1fr;gap:4px;padding:6px;}
+#actions.show{display:grid;}
+#actions button{font-size:12px;text-align:center;padding:8px 2px;}
+#moves{left:2%;right:2%;bottom:2%;display:none;grid-template-columns:1fr 1fr;gap:4px;padding:6px;}
+#moves.show{display:grid;}
+#moves button{font-size:11px;}
+#moves small{display:block;color:#7a7460;font-size:9px;}
+/* 리스트형 패널(파티/가방/메뉴) */
+.list{left:6%;right:6%;top:6%;max-height:88%;overflow:auto;padding:8px;}
+.list h3{font-size:12px;margin:2px 0 8px;color:var(--accent-dk);}
+.list .row{display:flex;align-items:center;gap:7px;width:100%;margin-bottom:5px;font-size:12px;}
+.list .row canvas{image-rendering:pixelated;width:28px;height:28px;flex:none;}
+.list .grow{flex:1;}
+.list .minihp{height:5px;background:#cfc8ae;border:1px solid var(--uiborder);border-radius:2px;overflow:hidden;margin-top:3px;}
+.list .minihp i{display:block;height:100%;background:#43b34a;}
+.fainted{opacity:.45;}
+/* 타이틀 */
+#title{inset:0;background:linear-gradient(180deg,#1d2b3f 0%,#27495e 55%,#3c7a55 100%);display:none;text-align:center;color:#fff;padding-top:9%;}
+#title.show{display:block;}
+#title h1{font-size:22px;line-height:1.4;text-shadow:3px 3px 0 #142031;letter-spacing:1px;}
+#title h1 span{color:#ffd75e;font-size:26px;display:block;}
+#title .mons{display:flex;justify-content:center;gap:10px;margin:12px 0;}
+#title .mons canvas{image-rendering:pixelated;width:44px;height:44px;animation:bob 1s infinite alternate;}
+#title .mons canvas:nth-child(2){animation-delay:.3s}
+#title .mons canvas:nth-child(3){animation-delay:.6s}
+#title button{display:block;margin:8px auto 0;text-align:center;width:60%;}
+#title .tiny{font-size:9px;color:#bcd;margin-top:10px;}
+/* 스타터 선택 */
+#starter{inset:4% 4% auto;padding:10px;display:none;}
+#starter.show{display:block;}
+#starter h3{font-size:12px;margin-bottom:8px;}
+#starter .opts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+#starter button{text-align:center;font-size:11px;padding:6px 2px;}
+#starter canvas{image-rendering:pixelated;width:40px;height:40px;display:block;margin:0 auto 3px;}
+/* 저장 코드 */
+#saveui{left:5%;right:5%;top:8%;padding:10px;}
+#saveui textarea{width:100%;height:70px;font-family:monospace;font-size:10px;border:2px solid var(--uiborder);border-radius:4px;padding:4px;background:#fff;}
+#saveui .btns{display:flex;gap:6px;margin-top:6px;}
+#saveui .btns button{flex:1;text-align:center;}
+/* 컨트롤러 */
+#pads{display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding:0 6px;}
+#dpad{position:relative;width:108px;height:108px;}
+#dpad button{
+  position:absolute;width:36px;height:36px;background:var(--btn);
+  border:2px solid #3e4150;border-radius:7px;box-shadow:0 3px 0 #33363f;color:#cfd2dd;
+  font-size:13px;text-align:center;padding:0;
+}
+#dpad button:active{box-shadow:none;transform:translateY(3px);}
+#dU{top:0;left:36px}#dD{bottom:0;left:36px}#dL{top:36px;left:0}#dR{top:36px;right:0}
+#dC{top:36px;left:36px;background:#4a4d5b;border-radius:3px;pointer-events:none;box-shadow:none;}
+#abtns{display:flex;gap:14px;align-items:flex-end;}
+.round{
+  width:52px;height:52px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#ef7a70,var(--accent) 60%,var(--accent-dk));
+  border:2px solid var(--accent-dk);box-shadow:0 4px 0 #7e2c27;
+  color:#fff;font-size:15px;text-align:center;padding:0;
+}
+.round:active{box-shadow:none;transform:translateY(4px);}
+#bB{margin-bottom:18px;background:radial-gradient(circle at 35% 30%,#8d92a5,#5b5f6e 60%,#43464f);border-color:#3a3d45;box-shadow:0 4px 0 #2e3037;}
+#startrow{text-align:center;margin-top:12px;}
+#bStart{font-size:9px;letter-spacing:1px;background:var(--shell-dk);border-radius:10px;padding:4px 16px;text-align:center;}
+#hint{font-size:9px;color:#8a8570;text-align:center;margin-top:10px;line-height:1.6;}
+@media(min-width:700px){ #pads{opacity:.92} }
+</style>
+</head>
+<body>
+<div id="console">
+  <div id="topbar"><span id="brand">ANT-BOY · COLOR</span><div id="powerled"></div></div>
+  <div id="screenwrap">
+    <div id="stage">
+      <canvas id="game" width="160" height="144"></canvas>
+
+      <div id="title" class="panel">
+        <h1>몬스터 퀘스트<span>새싹 마을</span></h1>
+        <div class="mons" id="titleMons"></div>
+        <button id="btnNew">▶ 모험 시작</button>
+        <button id="btnLoad">저장 코드 불러오기</button>
+        <p class="tiny">© 나만의 오리지널 몬스터 게임</p>
+      </div>
+
+      <div id="starter" class="panel win">
+        <h3>박사: 파트너 몬스터를 골라보게!</h3>
+        <div class="opts" id="starterOpts"></div>
+      </div>
+
+      <div id="ebox" class="panel win hpbox">
+        <div class="nm"><b id="eName"></b><span id="eLv"></span></div>
+        <div class="hpbar"><i id="eHp"></i></div>
+      </div>
+      <div id="pbox" class="panel win hpbox">
+        <div class="nm"><b id="pName"></b><span id="pLv"></span></div>
+        <div class="hpbar"><i id="pHp"></i></div>
+        <div class="hpnum" id="pHpNum"></div>
+        <div class="xpbar"><i id="pXp"></i></div>
+      </div>
+
+      <div id="actions" class="panel win"></div>
+      <div id="moves" class="panel win"></div>
+      <div id="party" class="panel win list"></div>
+      <div id="bag" class="panel win list"></div>
+      <div id="pause" class="panel win list"></div>
+      <div id="saveui" class="panel win"></div>
+
+      <div id="msg" class="panel win"><span id="msgText"></span><span class="arrow">▼</span></div>
+    </div>
+  </div>
+
+  <div id="pads">
+    <div id="dpad">
+      <button id="dU" data-dir="up" aria-label="위">▲</button>
+      <button id="dL" data-dir="left" aria-label="왼쪽">◀</button>
+      <button id="dC" tabindex="-1"></button>
+      <button id="dR" data-dir="right" aria-label="오른쪽">▶</button>
+      <button id="dD" data-dir="down" aria-label="아래">▼</button>
+    </div>
+    <div id="abtns">
+      <button id="bB" class="round" aria-label="B 취소">B</button>
+      <button id="bA" class="round" aria-label="A 확인">A</button>
+    </div>
+  </div>
+  <div id="startrow"><button id="bStart">START · 메뉴</button></div>
+  <p id="hint">이동: 방향키/WASD · A(확인): Z·Enter · B(취소): X·Esc · 메뉴: Shift</p>
+</div>
+<script>
+"use strict";
+/* =====================================================
+   몬스터 퀘스트: 새싹 마을  — 오리지널 몬스터 수집 RPG
+   ===================================================== */
+
+/* ---------- 타입 상성 ---------- */
+const EFF = {
+  '불':{'풀':2,'물':0.5,'불':0.5},
+  '물':{'불':2,'풀':0.5,'물':0.5},
+  '풀':{'물':2,'불':0.5,'풀':0.5},
+  '전기':{'물':2,'풀':0.5,'전기':0.5},
+  '노말':{}
+};
+const TYPE_ICON = {'불':'🔥','물':'💧','풀':'🌿','전기':'⚡','노말':'⭐'};
+
+/* ---------- 기술 ---------- */
+const MOVES = {
+  '몸통박치기':{type:'노말',power:35,acc:95},
+  '할퀴기':{type:'노말',power:40,acc:100},
+  '쪼기':{type:'노말',power:40,acc:100},
+  '가시찌르기':{type:'노말',power:50,acc:95},
+  '박치기':{type:'노말',power:55,acc:90},
+  '날개치기':{type:'노말',power:55,acc:95},
+  '더블어택':{type:'노말',power:60,acc:90},
+  '불씨':{type:'불',power:40,acc:100},
+  '화염숨결':{type:'불',power:60,acc:95},
+  '물방울':{type:'물',power:40,acc:100},
+  '물대포':{type:'물',power:60,acc:95},
+  '잎칼날':{type:'풀',power:40,acc:100},
+  '덩굴채찍':{type:'풀',power:60,acc:95},
+  '찌릿찌릿':{type:'전기',power:40,acc:100},
+  '번개침':{type:'전기',power:60,acc:95}
+};
+
+/* ---------- 몬스터 도감 (전부 오리지널!) ---------- */
+const DEX = {
+  bulkkori:{name:'불꼬리', type:'불',  base:{hp:39,atk:52,def:43,spd:65}, catch:.35, exp:64,
+    learn:[[1,'할퀴기'],[1,'불씨'],[9,'화염숨결'],[13,'더블어택']],
+    desc:'꼬리 끝의 불꽃이 기분에 따라 흔들리는 여우 몬스터.'},
+  bangulmong:{name:'방울몽', type:'물', base:{hp:44,atk:48,def:50,spd:43}, catch:.35, exp:64,
+    learn:[[1,'몸통박치기'],[1,'물방울'],[9,'물대포'],[13,'박치기']],
+    desc:'몸이 커다란 물방울로 이루어진 몬스터. 안아주면 출렁인다.'},
+  saessakji:{name:'새싹쥐', type:'풀', base:{hp:45,atk:49,def:49,spd:45}, catch:.35, exp:64,
+    learn:[[1,'할퀴기'],[1,'잎칼날'],[9,'덩굴채찍'],[13,'더블어택']],
+    desc:'머리의 새싹으로 광합성을 하는 부지런한 쥐 몬스터.'},
+  sommungchi:{name:'솜뭉치', type:'노말', base:{hp:40,atk:40,def:40,spd:50}, catch:.7, exp:40,
+    learn:[[1,'몸통박치기'],[4,'할퀴기'],[8,'박치기']],
+    desc:'바람에 날려 다니다가 마음에 드는 곳에 정착한다.'},
+  purusae:{name:'푸루새', type:'노말', base:{hp:38,atk:45,def:35,spd:60}, catch:.65, exp:44,
+    learn:[[1,'쪼기'],[7,'날개치기']],
+    desc:'아침마다 마을에 노래를 들려주는 파랑새 몬스터.'},
+  beongebeolle:{name:'번개벌레', type:'전기', base:{hp:35,atk:45,def:38,spd:70}, catch:.6, exp:48,
+    learn:[[1,'몸통박치기'],[3,'찌릿찌릿'],[10,'번개침']],
+    desc:'배를 비비면 정전기가 일어난다. 만지면 찌릿!'},
+  muldalpaeng:{name:'물달팽', type:'물', base:{hp:48,atk:42,def:55,spd:25}, catch:.6, exp:50,
+    learn:[[1,'몸통박치기'],[4,'물방울'],[11,'물대포']],
+    desc:'등껍질에 빗물을 모아 두고 천천히 마신다.'},
+  doldochi:{name:'돌도치', type:'노말', base:{hp:50,atk:55,def:58,spd:30}, catch:.55, exp:55,
+    learn:[[1,'몸통박치기'],[5,'가시찌르기'],[9,'박치기']],
+    desc:'등의 가시가 돌처럼 단단한 고슴도치 몬스터.'},
+  buldorong:{name:'불도롱', type:'불', base:{hp:42,atk:55,def:40,spd:58}, catch:.3, exp:62,
+    learn:[[1,'할퀴기'],[1,'불씨'],[8,'화염숨결']],
+    desc:'따뜻한 바위 밑에 숨어 사는 희귀한 도롱뇽 몬스터.'}
+};
+
+/* ---------- 아이템 ---------- */
+const ITEMS = {
+  capsule:{name:'캡슐', desc:'야생 몬스터를 잡는다', kind:'ball', bonus:1},
+  capsuleX:{name:'고급캡슐', desc:'잘 잡히는 캡슐', kind:'ball', bonus:1.6},
+  potion:{name:'회복약', desc:'HP를 30 회복', kind:'heal', amt:30}
+};
+</script>
+<script>
+"use strict";
+/* ---------- 픽셀 스프라이트 (좌우대칭 미러) ---------- */
+function makeSprite(half, pal){
+  const c=document.createElement('canvas'); c.width=16; c.height=16;
+  const g=c.getContext('2d');
+  half.forEach((row,y)=>{ for(let x=0;x<8;x++){ const ch=row[x];
+    if(ch && ch!=='.'){ g.fillStyle=pal[ch]; g.fillRect(x,y,1,1); g.fillRect(15-x,y,1,1);} } });
+  return c;
+}
+const SPR = {};
+SPR.bulkkori = makeSprite([
+"........",
+"..O.....",
+"..OO....",
+"..OOO...",
+"...OOO..",
+"..OOOOO.",
+"..OccoK.",
+"..Occoo.",
+"...Oooo.",
+"..ROOOO.",
+".RYOOOO.",
+".RYOOOo.",
+"..ROOOo.",
+"...OOOO.",
+"...K..K.",
+"........"],{O:'#e8743c',o:'#f2a65e',c:'#ffe8c8',K:'#4a2517',R:'#d9402a',Y:'#ffc93c'});
+SPR.bangulmong = makeSprite([
+"........",
+".....B..",
+"....BB..",
+"...Bbb..",
+"..Bbbbb.",
+".Bbbbbb.",
+".BbKbbb.",
+".Bbbbbb.",
+".Bbbwbb.",
+".Bbbbbb.",
+".Bbbbbb.",
+"..Bbbbb.",
+"...BBBB.",
+"........",
+"........",
+"........"],{B:'#2e6fb0',b:'#6fb3e8',K:'#1d3a55',w:'#ffffff'});
+SPR.saessakji = makeSprite([
+"........",
+".....L..",
+"....LL..",
+".....l..",
+"..g..l..",
+".gg.ggg.",
+".ggggggg",
+".gGKgggg",
+".gGggggg",
+"..gggggg",
+".ggggggg",
+".gggggGg",
+".gggggGg",
+"..ggggg.",
+"...K..K.",
+"........"],{L:'#3f9b3f',l:'#7ac74a',g:'#a8d878',G:'#7ab84e',K:'#2e4520'});
+SPR.sommungchi = makeSprite([
+"........",
+"...w.w..",
+"..wwwww.",
+".wwwwwww",
+".wwwwwww",
+"wwwKwwww",
+"wwwwwwww",
+"wwwpwwww",
+".wwwwwww",
+".wwwwwww",
+"..wwwww.",
+"...w.w..",
+"........",
+"........",
+"........",
+"........"],{w:'#f5f1e6',K:'#3a3a3a',p:'#e8a0a0'});
+SPR.purusae = makeSprite([
+"........",
+"...bb...",
+"..bbbb..",
+".bbKbbb.",
+".bbbbY..",
+"..bbbb..",
+".Bbbbbb.",
+".BBbbbb.",
+".BBBbbb.",
+"..Bbbbb.",
+"...bbb..",
+"...Y.Y..",
+"........",
+"........",
+"........",
+"........"],{b:'#5aa7e0',B:'#2e6fb0',K:'#1d3a55',Y:'#f0b429'});
+SPR.beongebeolle = makeSprite([
+"........",
+"..k..k..",
+"...kk...",
+"..yyyy..",
+".yyKyyy.",
+".yyyyyy.",
+"..yyyy..",
+".ykkkky.",
+".yyyyyy.",
+".ykkkky.",
+".yyyyyy.",
+"..yyyy..",
+"..k..k..",
+"........",
+"........",
+"........"],{y:'#ffd75e',k:'#3a3a2a',K:'#2a2a1a'});
+SPR.muldalpaeng = makeSprite([
+"........",
+"........",
+"...SSS..",
+"..SsssS.",
+".SsSSsS.",
+".SsSsSS.",
+".SsssSS.",
+"..SSSS..",
+".bbbbbb.",
+"bbKbbbbb",
+"bbbbbbbb",
+".bbbbbb.",
+"........",
+"........",
+"........",
+"........"],{S:'#b07a4a',s:'#e0b078',b:'#7fc7e8',K:'#1d3a55'});
+SPR.doldochi = makeSprite([
+"........",
+"...s.s..",
+"..sssss.",
+".sssssss",
+".sBssBss",
+"sssssBss",
+"sBssssss",
+"ssssBsss",
+".sssssss",
+".ssbbbbb",
+"..bbKbbb",
+"..bbbbbb",
+"...bbbb.",
+"...K..K.",
+"........",
+"........"],{s:'#8a7a64',B:'#5d5142',b:'#d8b88a',K:'#3a2a1a'});
+SPR.buldorong = makeSprite([
+"........",
+"..rrr...",
+".rrrrr..",
+".rKrrr..",
+".rrrrrY.",
+"..rrrY..",
+".rrrrr..",
+".rOOOr..",
+".rOOOrr.",
+".rrrrrr.",
+"..rrrr..",
+".Yrrrr..",
+"..r..r..",
+"........",
+"........",
+"........"],{r:'#d9534a',O:'#f2a65e',Y:'#ffc93c',K:'#3a1515'});
+
+/* ---------- 맵 ---------- */
+const MAPW=28, MAPH=24, TILE=16;
+const MAP_SRC = [
+"TTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+"TGGGtttGGGGGGGGGttttGGGGGGGT",
+"TGGGtttGGGFFGGGGttttGGGWWGGT",
+"TGGGtttGGGFFGGGGttttGGWWWWGT",
+"TGGGGGGGGGGGGGGGGGGGGGWWWWGT",
+"TGGttttGGGGPPGGGGGGGGGGWWGGT",
+"TGGttttGGGGPPGGGttttGGGGGGGT",
+"TGGttttGGGGPPGGGttttGGGGGGGT",
+"TGGttttGGGGPPGGGttttGGFFGGGT",
+"TGGGGGGGGGGPPGGGGGGGGGGGGGGT",
+"TTTTTTTGGGGPPGGGGTTTTTTTTTTT",
+"TGGGGGGGGGGPPGGGGGGGGGGGGGGT",
+"TGGFFGGGGGGPPGGGGGGGttttGGGT",
+"TGGGGGGGGGGPPGGGGGGGttttGGGT",
+"TGGGHHHGGGGPPGGGHHHGttttGGGT",
+"TGGGBDBGGGGPPGGGBdBGGGGGGGGT",
+"TGGGPPPPPPPPPPPPPPPGGGGGGGGT",
+"TGGGGGGGGGGPPGGGGGGGGGFFGGGT",
+"TGGGGGGGGSGPPGGGGGGGGGGGGGGT",
+"TGGGGGGGGGGPPGGGGGGGGGGGGGGT",
+"TGGGGGGGGGGPPGGGGGGGGGGGGGGT",
+"TGGGGGGGGGGGGGGGGGGGGGGGGGGT",
+"TGGGGGGGGGGGGGGGGGGGGGGGGGGT",
+"TTTTTTTTTTTTTTTTTTTTTTTTTTTT"
+].map(r=>r.padEnd(MAPW,'T').slice(0,MAPW));
+const SOLID = new Set(['T','W','H','B','S','D','d']);
+
+/* 야생 출현 테이블: 북쪽(y<10)이 더 강함 */
+const WILD = {
+  south:{lv:[2,4], pool:[['sommungchi',40],['purusae',35],['saessakji',15],['doldochi',10]]},
+  north:{lv:[3,6], pool:[['beongebeolle',30],['muldalpaeng',25],['doldochi',20],['purusae',15],['buldorong',10]]}
+};
+
+/* ---------- 몬스터 인스턴스 ---------- */
+function expToNext(lv){ return lv*lv*5; }
+function calcStats(m){
+  const b=DEX[m.id].base;
+  m.maxHp = Math.floor(b.hp*2*m.lv/100)+m.lv+10;
+  m.atk   = Math.floor(b.atk*2*m.lv/100)+5;
+  m.def   = Math.floor(b.def*2*m.lv/100)+5;
+  m.spd   = Math.floor(b.spd*2*m.lv/100)+5;
+}
+function makeMon(id, lv){
+  const m={id, lv, exp:0, moves:[]};
+  DEX[id].learn.forEach(([l,mv])=>{ if(l<=lv) addMove(m,mv,true); });
+  calcStats(m); m.hp=m.maxHp;
+  return m;
+}
+function addMove(m,mv,silent){
+  if(m.moves.includes(mv)) return null;
+  if(m.moves.length<4){ m.moves.push(mv); return 'new'; }
+  const old=m.moves.shift(); m.moves.push(mv); return old;
+}
+const nameOf = m => DEX[m.id].name;
+
+/* ---------- 게임 상태 ---------- */
+const G = {
+  state:'title',          // title | starter | world | battle | dialog
+  px:12, py:17, dir:'down', moving:false, mx:0, my:0, walkT:0, frame:0,
+  party:[], bag:{capsule:8, capsuleX:0, potion:4},
+  stepsSafe:0, anim:0, money:0
+};
+
+/* ---------- 입력 ---------- */
+const held = {up:false,down:false,left:false,right:false};
+let aWaiters = [];
+function pressA(){ const w=aWaiters; aWaiters=[]; w.forEach(f=>f()); }
+function waitA(){ return new Promise(res=>aWaiters.push(res)); }
+let bHandler=null, startHandler=null;
+
+const KEYMAP = {ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',
+  w:'up',s:'down',a:'left',d:'right',W:'up',S:'down',A:'left',D:'right'};
+addEventListener('keydown',e=>{
+  if(e.repeat) return;
+  if(KEYMAP[e.key]){ held[KEYMAP[e.key]]=true; e.preventDefault(); }
+  else if(e.key==='z'||e.key==='Z'||e.key==='Enter'||e.key===' '){ onA(); e.preventDefault(); }
+  else if(e.key==='x'||e.key==='X'||e.key==='Escape'){ onB(); }
+  else if(e.key==='Shift'){ onStart(); }
+});
+addEventListener('keyup',e=>{ if(KEYMAP[e.key]) held[KEYMAP[e.key]]=false; });
+document.querySelectorAll('#dpad button[data-dir]').forEach(b=>{
+  const d=b.dataset.dir;
+  const on=e=>{e.preventDefault();held[d]=true;};
+  const off=e=>{e.preventDefault();held[d]=false;};
+  b.addEventListener('pointerdown',on);
+  b.addEventListener('pointerup',off); b.addEventListener('pointerleave',off); b.addEventListener('pointercancel',off);
+});
+document.getElementById('bA').addEventListener('pointerdown',e=>{e.preventDefault();onA();});
+document.getElementById('bB').addEventListener('pointerdown',e=>{e.preventDefault();onB();});
+document.getElementById('bStart').addEventListener('click',()=>onStart());
+document.getElementById('msg').addEventListener('pointerdown',()=>pressA());
+
+function onA(){
+  if(aWaiters.length){ pressA(); return; }
+  if(G.state==='world') interact();
+}
+function onB(){ if(bHandler) bHandler(); }
+function onStart(){ if(startHandler) startHandler(); else if(G.state==='world') openPause(); }
+
+/* ---------- 사운드 (Web Audio 칩튠 블립) ---------- */
+let AC=null;
+function beep(freq=440,dur=.07,type='square',vol=.05){
+  try{
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(), g=AC.createGain();
+    o.type=type; o.frequency.value=freq;
+    g.gain.setValueAtTime(vol,AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+dur);
+    o.connect(g).connect(AC.destination); o.start(); o.stop(AC.currentTime+dur);
+  }catch(e){}
+}
+const sfx={
+  ok:()=>beep(880,.06), cancel:()=>beep(330,.06),
+  hit:()=>beep(180,.1,'sawtooth',.06), super:()=>{beep(160,.09,'sawtooth',.07);setTimeout(()=>beep(120,.12,'sawtooth',.07),70);},
+  heal:()=>{beep(660,.07);setTimeout(()=>beep(880,.07),80);setTimeout(()=>beep(1100,.1),160);},
+  throwB:()=>beep(520,.08,'triangle',.06), shake:()=>beep(300,.05,'triangle',.05),
+  catchOk:()=>{[523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,.12,'square',.05),i*110));},
+  lvup:()=>{[392,523,659,784].forEach((f,i)=>setTimeout(()=>beep(f,.1),i*90));},
+  faint:()=>{beep(220,.15,'sawtooth',.06);setTimeout(()=>beep(140,.25,'sawtooth',.06),120);},
+  enc:()=>{beep(440,.06);setTimeout(()=>beep(330,.06),70);setTimeout(()=>beep(440,.06),140);}
+};
+</script>
+<script>
+"use strict";
+/* ---------- 렌더링 ---------- */
+const cv=document.getElementById('game'), ctx=cv.getContext('2d');
+ctx.imageSmoothingEnabled=false;
+const VW=10, VH=9; // 화면에 보이는 타일 수 (160x144)
+
+function tileRand(x,y,n){ return ((x*73856093) ^ (y*19349663)) % n; }
+
+function drawTile(ch,x,y,sx,sy){
+  const t=G.anim;
+  switch(ch){
+    case 'G': ctx.fillStyle='#8fc764'; ctx.fillRect(sx,sy,16,16);
+      if(tileRand(x,y,4)===0){ ctx.fillStyle='#7eb853'; ctx.fillRect(sx+4,sy+5,2,2); ctx.fillRect(sx+10,sy+11,2,2);} break;
+    case 't': ctx.fillStyle='#6aa845'; ctx.fillRect(sx,sy,16,16);
+      ctx.fillStyle='#4d8a32';
+      for(const [gx,gy] of [[2,3],[8,2],[12,6],[4,10],[10,11]]){
+        ctx.fillRect(sx+gx,sy+gy+3,1,3); ctx.fillRect(sx+gx+2,sy+gy+3,1,3); ctx.fillRect(sx+gx+1,sy+gy+1,1,3);
+      } break;
+    case 'T': ctx.fillStyle='#8fc764'; ctx.fillRect(sx,sy,16,16);
+      ctx.fillStyle='#5d4030'; ctx.fillRect(sx+6,sy+10,4,5);
+      ctx.fillStyle='#3f7a2e'; ctx.fillRect(sx+2,sy+2,12,10);
+      ctx.fillStyle='#56964a'; ctx.fillRect(sx+3,sy+3,5,4); ctx.fillRect(sx+9,sy+6,4,3);
+      ctx.fillStyle='#2e5c22'; ctx.fillRect(sx+2,sy+10,12,2); break;
+    case 'W': { ctx.fillStyle='#4a90d9'; ctx.fillRect(sx,sy,16,16);
+      ctx.fillStyle='#7fb8ef'; const off=(Math.floor(t/24)%2)*2;
+      ctx.fillRect(sx+2+off,sy+4,5,1); ctx.fillRect(sx+8-off,sy+10,5,1); break; }
+    case 'P': ctx.fillStyle='#dcc68f'; ctx.fillRect(sx,sy,16,16);
+      ctx.fillStyle='#c9b275'; if(tileRand(x,y,3)===0){ctx.fillRect(sx+3,sy+4,2,2);ctx.fillRect(sx+11,sy+10,2,2);} break;
+    case 'F': ctx.fillStyle='#8fc764'; ctx.fillRect(sx,sy,16,16);
+      ctx.fillStyle='#f06a8a'; ctx.fillRect(sx+3,sy+3,3,3); ctx.fillRect(sx+10,sy+9,3,3);
+      ctx.fillStyle='#ffd75e'; ctx.fillRect(sx+4,sy+4,1,1); ctx.fillRect(sx+11,sy+10,1,1); break;
+    case 'H': ctx.fillStyle='#c75046'; ctx.fillRect(sx,sy,16,16);
+      ctx.fillStyle='#a93c35'; ctx.fillRect(sx,sy+6,16,2); ctx.fillRect(sx,sy+13,16,2); break;
+    case 'B': ctx.fillStyle='#efe3c2'; ctx.fillRect(sx,sy,16,16);
+      ctx.fillStyle='#7fb8ef'; ctx.fillRect(sx+4,sy+4,8,6);
+      ctx.fillStyle='#5b4a3a'; ctx.strokeStyle='#5b4a3a'; ctx.fillRect(sx+4,sy+6,8,1); break;
+    case 'D': case 'd': ctx.fillStyle='#efe3c2'; ctx.fillRect(sx,sy,16,16);
+      ctx.fillStyle='#8a5a32'; ctx.fillRect(sx+3,sy+2,10,14);
+      ctx.fillStyle='#5d4030'; ctx.fillRect(sx+3,sy+2,10,2);
+      ctx.fillStyle='#ffd75e'; ctx.fillRect(sx+11,sy+9,1,2);
+      if(ch==='D'){ ctx.fillStyle='#fff'; ctx.fillRect(sx+5,sy+4,6,3); ctx.fillStyle='#d9534a'; ctx.fillRect(sx+7,sy+4,2,3); ctx.fillRect(sx+5,sy+5,6,1);} break;
+    case 'S': ctx.fillStyle='#8fc764'; ctx.fillRect(sx,sy,16,16);
+      ctx.fillStyle='#8a5a32'; ctx.fillRect(sx+7,sy+8,2,6);
+      ctx.fillStyle='#b07a4a'; ctx.fillRect(sx+2,sy+2,12,7);
+      ctx.fillStyle='#5d4030'; ctx.fillRect(sx+4,sy+4,8,1); ctx.fillRect(sx+4,sy+6,6,1); break;
+  }
+}
+
+function drawPlayer(sx,sy){
+  const f = G.moving ? Math.floor(G.walkT/8)%2 : 0;
+  const d = G.dir;
+  // 그림자
+  ctx.fillStyle='rgba(0,0,0,.2)'; ctx.fillRect(sx+3,sy+13,10,3);
+  // 다리
+  ctx.fillStyle='#3a5a8a';
+  if(f===0){ ctx.fillRect(sx+5,sy+11,2,4); ctx.fillRect(sx+9,sy+11,2,4); }
+  else{ ctx.fillRect(sx+4,sy+11,2,4); ctx.fillRect(sx+10,sy+10,2,4); }
+  // 몸통
+  ctx.fillStyle='#d9534a'; ctx.fillRect(sx+4,sy+7,8,5);
+  // 팔
+  ctx.fillStyle='#f3c89a'; ctx.fillRect(sx+3,sy+8,1,3); ctx.fillRect(sx+12,sy+8,1,3);
+  // 머리
+  ctx.fillStyle='#f3c89a'; ctx.fillRect(sx+4,sy+1,8,7);
+  // 머리카락 + 모자
+  ctx.fillStyle='#4a3526';
+  ctx.fillRect(sx+4,sy+1,8,2);
+  ctx.fillStyle='#e0492f'; ctx.fillRect(sx+3,sy+0,10,2);
+  if(d==='down'||d==='left'||d==='right'){
+    ctx.fillStyle='#2a2d26';
+    if(d==='down'){ ctx.fillRect(sx+6,sy+4,1,2); ctx.fillRect(sx+9,sy+4,1,2); }
+    if(d==='left'){ ctx.fillRect(sx+5,sy+4,1,2); ctx.fillRect(sx+8,sy+4,1,2); }
+    if(d==='right'){ ctx.fillRect(sx+7,sy+4,1,2); ctx.fillRect(sx+10,sy+4,1,2); }
+  } else { ctx.fillStyle='#4a3526'; ctx.fillRect(sx+4,sy+1,8,5); ctx.fillStyle='#e0492f'; ctx.fillRect(sx+3,sy,10,2);}
+}
+
+function renderWorld(){
+  const pxl = G.px*16 + G.mx, pyl = G.py*16 + G.my;
+  let camX = Math.round(pxl - (VW/2-0.5)*16), camY = Math.round(pyl - (VH/2-0.5)*16);
+  camX = Math.max(0, Math.min(camX, MAPW*16-160));
+  camY = Math.max(0, Math.min(camY, MAPH*16-144));
+  const tx0=Math.floor(camX/16), ty0=Math.floor(camY/16);
+  for(let y=ty0; y<=ty0+VH; y++) for(let x=tx0; x<=tx0+VW; x++){
+    if(x<0||y<0||x>=MAPW||y>=MAPH) continue;
+    drawTile(MAP_SRC[y][x], x, y, x*16-camX, y*16-camY);
+  }
+  drawPlayer(pxl-camX, pyl-camY);
+}
+
+/* ---------- 이동 & 상호작용 ---------- */
+function tileAt(x,y){ return (x<0||y<0||x>=MAPW||y>=MAPH)?'T':MAP_SRC[y][x]; }
+const DIRV={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
+
+function tryStep(){
+  for(const d of ['up','down','left','right']){
+    if(!held[d]) continue;
+    G.dir=d;
+    const [dx,dy]=DIRV[d], nx=G.px+dx, ny=G.py+dy;
+    if(!SOLID.has(tileAt(nx,ny))){ G.moving=true; G.tx=nx; G.ty=ny; G.walkT=0; }
+    return;
+  }
+}
+function updateWorld(){
+  if(!G.moving){ tryStep(); return; }
+  G.walkT++;
+  const sp=2, [dx,dy]=DIRV[G.dir];
+  G.mx+=dx*sp; G.my+=dy*sp;
+  if(Math.abs(G.mx)>=16||Math.abs(G.my)>=16){
+    G.px=G.tx; G.py=G.ty; G.mx=0; G.my=0; G.moving=false;
+    onArrive();
+  }
+}
+function onArrive(){
+  const ch=tileAt(G.px,G.py);
+  if(ch==='t'){
+    if(G.stepsSafe>0){ G.stepsSafe--; return; }
+    if(Math.random()<0.13){
+      G.stepsSafe=3;
+      const zone = G.py<10 ? WILD.north : WILD.south;
+      let r=Math.random()*100, id=zone.pool[0][0];
+      for(const [pid,w] of zone.pool){ if(r<w){id=pid;break;} r-=w; }
+      const lv = zone.lv[0]+Math.floor(Math.random()*(zone.lv[1]-zone.lv[0]+1));
+      startBattle(makeMon(id,lv));
+    }
+  }
+}
+async function interact(){
+  const [dx,dy]=DIRV[G.dir];
+  const ch=tileAt(G.px+dx,G.py+dy);
+  if(ch==='S'){ sfx.ok(); await dialog(['【표지판】','↑ 북쪽 풀숲: 강한 야생 몬스터 주의!','센터(♥ 표시 집)에서 회복할 수 있습니다.']); }
+  else if(ch==='D'){ sfx.heal();
+    G.party.forEach(m=>{m.hp=m.maxHp;});
+    if(G.bag.capsule<5) G.bag.capsule=5;
+    await dialog(['【몬스터 센터】','어서 오세요! 몬스터를 회복해 드릴게요…','띠로리~♪ 모두 건강해졌습니다!','캡슐도 5개까지 채워 드렸어요. 또 오세요!']);
+  }
+  else if(ch==='d'){ sfx.heal();
+    G.party.forEach(m=>{m.hp=m.maxHp;});
+    await dialog(['【내 집】','침대에 누워 푹 쉬었다…','파티 몬스터가 모두 회복되었다!']);
+  }
+}
+
+/* ---------- 메시지 / 다이얼로그 ---------- */
+const $=id=>document.getElementById(id);
+function show(id){ $(id).classList.add('show'); }
+function hide(id){ $(id).classList.remove('show'); }
+async function say(text){
+  show('msg'); $('msgText').textContent='';
+  for(let i=0;i<text.length;i++){
+    $('msgText').textContent+=text[i];
+    if(i%2===0) await sleep(14);
+    if(aWaiters.length===0){} // 타이핑 중 스킵 없음(단순화)
+  }
+  await waitA(); sfx.ok();
+}
+async function dialog(lines){
+  const prev=G.state; G.state='dialog';
+  for(const l of lines) await say(l);
+  hide('msg'); G.state=prev;
+}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+/* ---------- 메인 루프 ---------- */
+function loop(){
+  G.anim++;
+  if(G.state==='world'||G.state==='dialog'){
+    if(G.state==='world') updateWorld();
+    renderWorld();
+  } else if(G.state==='battle'){
+    renderBattle();
+  }
+  requestAnimationFrame(loop);
+}
+</script>
+<script>
+"use strict";
+/* ---------- 배틀 ---------- */
+const B = { foe:null, ally:null, anim:{eShake:0,pShake:0,eFlash:0,pFlash:0,ballY:-1,eVisible:true} };
+const aliveParty = ()=>G.party.filter(m=>m.hp>0);
+
+function renderBattle(){
+  // 배경
+  const grad=ctx.createLinearGradient(0,0,0,144);
+  grad.addColorStop(0,'#cfe8f5'); grad.addColorStop(.6,'#b8dCc2'); grad.addColorStop(1,'#9ccb8a');
+  ctx.fillStyle='#cfe8f5'; ctx.fillRect(0,0,160,60);
+  ctx.fillStyle='#bfe0c8'; ctx.fillRect(0,60,160,40);
+  ctx.fillStyle='#a8d49a'; ctx.fillRect(0,100,160,44);
+  // 플랫폼
+  ctx.fillStyle='#8fbf7a'; ctx.beginPath(); ctx.ellipse(116,72,34,10,0,0,7); ctx.fill();
+  ctx.fillStyle='#7fb86a'; ctx.beginPath(); ctx.ellipse(42,126,40,12,0,0,7); ctx.fill();
+  const t=G.anim;
+  // 상대 (앞모습)
+  if(B.foe && B.anim.eVisible){
+    const bobY=Math.sin(t/20)*1.5;
+    const sx=116-24+(B.anim.eShake>0?Math.sin(t)*3:0);
+    if(!(B.anim.eFlash>0 && Math.floor(t/3)%2===0)){
+      ctx.drawImage(SPR[B.foe.id],0,0,16,16, Math.round(sx),Math.round(28+bobY),48,48);
+    }
+    if(B.anim.eShake>0)B.anim.eShake--; if(B.anim.eFlash>0)B.anim.eFlash--;
+  }
+  // 캡슐 던지기 연출
+  if(B.anim.ballY>=0){
+    ctx.fillStyle='#d9534a'; ctx.beginPath(); ctx.arc(116,B.anim.ballY,5,0,7); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.fillRect(111,B.anim.ballY-1,10,2);
+  }
+  // 내 몬스터 (등 — 크게)
+  if(B.ally && B.ally.hp>0){
+    const sx=42-32+(B.anim.pShake>0?Math.sin(t)*3:0);
+    if(!(B.anim.pFlash>0 && Math.floor(t/3)%2===0)){
+      ctx.drawImage(SPR[B.ally.id],0,0,16,16, Math.round(sx),68,64,64);
+    }
+    if(B.anim.pShake>0)B.anim.pShake--; if(B.anim.pFlash>0)B.anim.pFlash--;
+  }
+}
+
+function setHpBar(el,m){
+  const r=Math.max(0,m.hp/m.maxHp);
+  el.style.width=(r*100)+'%';
+  el.className = r<.21?'low':(r<.51?'mid':'');
+}
+function refreshBoxes(){
+  if(B.foe){ $('eName').textContent=nameOf(B.foe)+' '+TYPE_ICON[DEX[B.foe.id].type]; $('eLv').textContent='Lv'+B.foe.lv; setHpBar($('eHp'),B.foe); }
+  if(B.ally){
+    $('pName').textContent=nameOf(B.ally)+' '+TYPE_ICON[DEX[B.ally.id].type]; $('pLv').textContent='Lv'+B.ally.lv;
+    setHpBar($('pHp'),B.ally); $('pHpNum').textContent=Math.max(0,B.ally.hp)+' / '+B.ally.maxHp;
+    $('pXp').style.width=Math.min(100,(B.ally.exp/expToNext(B.ally.lv))*100)+'%';
+  }
+}
+
+function damage(att,def,mv){
+  const M=MOVES[mv];
+  let d=((2*att.lv/5+2)*M.power*att.atk/def.def)/50+2;
+  const stab = DEX[att.id].type===M.type?1.5:1;
+  let eff=1; const tbl=EFF[M.type]||{}; eff*= tbl[DEX[def.id].type]??1;
+  d*=stab*eff*(0.85+Math.random()*0.15);
+  return {dmg:Math.max(1,Math.floor(d)), eff};
+}
+
+async function doMove(att,def,mv,isAlly){
+  await say(`${nameOf(att)}의 ${mv}!`);
+  if(Math.random()*100>MOVES[mv].acc){ await say('그러나 빗나갔다!'); return; }
+  const {dmg,eff}=damage(att,def,mv);
+  def.hp=Math.max(0,def.hp-dmg);
+  if(isAlly){ B.anim.eShake=14; B.anim.eFlash=14; } else { B.anim.pShake=14; B.anim.pFlash=14; }
+  eff>1?sfx.super():sfx.hit();
+  refreshBoxes(); await sleep(420);
+  if(eff>1) await say('효과가 굉장했다!');
+  else if(eff<1) await say('효과가 별로인 듯하다…');
+}
+
+function pickAction(){ // 배틀 커맨드 선택
+  return new Promise(res=>{
+    const A=$('actions'); A.innerHTML='';
+    [['fight','⚔ 싸우다'],['bag','🎒 가방'],['party','📦 교체'],['run','🏃 도망']].forEach(([k,label])=>{
+      const b=document.createElement('button'); b.textContent=label;
+      b.onclick=()=>{ sfx.ok(); A.classList.remove('show'); res(k); };
+      A.appendChild(b);
+    });
+    show('msg'); $('msgText').textContent=`${nameOf(B.ally)}은(는) 어떻게 할까?`;
+    A.classList.add('show');
+    bHandler=null;
+  });
+}
+function pickMove(){
+  return new Promise(res=>{
+    const M=$('moves'); M.innerHTML='';
+    B.ally.moves.forEach(mv=>{
+      const info=MOVES[mv];
+      const b=document.createElement('button');
+      b.innerHTML=`${TYPE_ICON[info.type]} ${mv}<small>위력 ${info.power} · 명중 ${info.acc}</small>`;
+      b.onclick=()=>{ sfx.ok(); M.classList.remove('show'); bHandler=null; res(mv); };
+      M.appendChild(b);
+    });
+    M.classList.add('show');
+    bHandler=()=>{ sfx.cancel(); M.classList.remove('show'); bHandler=null; res(null); };
+  });
+}
+function pickFromList(title, rows, allowCancel=true){
+  // rows: [{label, sub, hpRatio, mon, disabled, fn}]
+  return new Promise(res=>{
+    const P=$('party'); P.innerHTML=`<h3>${title}</h3>`;
+    rows.forEach(r=>{
+      const b=document.createElement('button'); b.className='row'+(r.disabled?' fainted':'');
+      if(r.mon){
+        const c=document.createElement('canvas'); c.width=16;c.height=16;
+        c.getContext('2d').drawImage(SPR[r.mon.id],0,0); b.appendChild(c);
+      }
+      const dv=document.createElement('div'); dv.className='grow';
+      dv.innerHTML=`<div>${r.label}</div>`+(r.sub?`<div style="font-size:10px;color:#7a7460">${r.sub}</div>`:'');
+      if(r.mon){ const hp=document.createElement('div'); hp.className='minihp';
+        const i=document.createElement('i'); i.style.width=(r.mon.hp/r.mon.maxHp*100)+'%';
+        if(r.mon.hp/r.mon.maxHp<.21)i.style.background='#d9534a'; else if(r.mon.hp/r.mon.maxHp<.51)i.style.background='#e6a23c';
+        hp.appendChild(i); dv.appendChild(hp); }
+      b.appendChild(dv);
+      if(!r.disabled) b.onclick=()=>{ sfx.ok(); hide('party'); bHandler=null; res(r.value); };
+      P.appendChild(b);
+    });
+    if(allowCancel){
+      const back=document.createElement('button'); back.className='row'; back.textContent='↩ 돌아가기';
+      back.onclick=()=>{ sfx.cancel(); hide('party'); bHandler=null; res(null); };
+      P.appendChild(back);
+      bHandler=()=>{ sfx.cancel(); hide('party'); bHandler=null; res(null); };
+    } else bHandler=null;
+    show('party');
+  });
+}
+function partyRows(forSwitch){
+  return G.party.map((m,i)=>({
+    label:`${nameOf(m)}  Lv${m.lv}`,
+    sub:`HP ${m.hp}/${m.maxHp} · ${DEX[m.id].type}타입`,
+    mon:m, value:i,
+    disabled: forSwitch && (m.hp<=0 || m===B.ally)
+  }));
+}
+function bagRowsBattle(){
+  const rows=[];
+  for(const [k,v] of Object.entries(G.bag)) if(v>0)
+    rows.push({label:`${ITEMS[k].name} ×${v}`, sub:ITEMS[k].desc, value:k});
+  if(!rows.length) rows.push({label:'(가방이 비었다)', disabled:true, value:null});
+  return rows;
+}
+
+/* --- 포획 --- */
+async function throwCapsule(kind){
+  G.bag[kind]--;
+  sfx.throwB();
+  await sayNoWait(`${ITEMS[kind].name}을(를) 던졌다!`);
+  for(let y=120;y>50;y-=6){ B.anim.ballY=y; await sleep(24); }
+  B.anim.eVisible=false; B.anim.ballY=58; await sleep(350);
+  const hpFrac=B.foe.hp/B.foe.maxHp;
+  const chance=Math.min(.95, DEX[B.foe.id].catch * ITEMS[kind].bonus * (1.6-1.1*hpFrac));
+  let shakes=0;
+  for(let i=0;i<3;i++){
+    await sleep(450); sfx.shake();
+    await sayNoWait('흔들'+'…'.repeat(i+1));
+    if(Math.random()>Math.pow(chance,1/3)) break;
+    shakes++;
+  }
+  await sleep(400);
+  if(shakes===3){
+    sfx.catchOk(); B.anim.ballY=-1;
+    await say(`신난다! ${nameOf(B.foe)}을(를) 잡았다!`);
+    if(G.party.length<6){ G.party.push(B.foe); await say(`${nameOf(B.foe)}이(가) 파티에 합류했다!`); }
+    else await say('파티가 가득 차서… 몬스터가 야생으로 돌아갔다. (최대 6마리)');
+    return true;
+  }
+  B.anim.ballY=-1; B.anim.eVisible=true;
+  await say('아앗! 캡슐에서 빠져나왔다!');
+  return false;
+}
+async function sayNoWait(text){ show('msg'); $('msgText').textContent=text; await sleep(500); }
+
+/* --- 경험치/레벨업 --- */
+async function gainExp(){
+  const amt=Math.floor(DEX[B.foe.id].exp*B.foe.lv/6)+1;
+  B.ally.exp+=amt; refreshBoxes();
+  await say(`${nameOf(B.ally)}은(는) 경험치 ${amt}을(를) 얻었다!`);
+  while(B.ally.exp>=expToNext(B.ally.lv)){
+    B.ally.exp-=expToNext(B.ally.lv); B.ally.lv++;
+    const oldMax=B.ally.maxHp; calcStats(B.ally); B.ally.hp+=B.ally.maxHp-oldMax;
+    sfx.lvup(); refreshBoxes();
+    await say(`${nameOf(B.ally)}의 레벨이 ${B.ally.lv}(으)로 올랐다!`);
+    for(const [l,mv] of DEX[B.ally.id].learn){
+      if(l===B.ally.lv){
+        const r=addMove(B.ally,mv);
+        if(r==='new') await say(`${mv}을(를) 배웠다!`);
+        else if(r) await say(`${r}을(를) 잊고 ${mv}을(를) 배웠다!`);
+      }
+    }
+  }
+}
+
+/* --- 배틀 본체 --- */
+async function startBattle(foe){
+  G.state='battle'; sfx.enc();
+  B.foe=foe; B.ally=aliveParty()[0];
+  B.anim={eShake:0,pShake:0,eFlash:0,pFlash:0,ballY:-1,eVisible:true};
+  refreshBoxes(); show('ebox'); show('pbox');
+  await say(`앗! 야생의 ${nameOf(foe)}이(가) 나타났다!`);
+  await say(`가라! ${nameOf(B.ally)}!`);
+
+  battleLoop:
+  while(true){
+    const act=await pickAction();
+    let allyMove=null, skipFoe=false;
+
+    if(act==='fight'){
+      allyMove=await pickMove();
+      if(!allyMove) continue;
+    }
+    else if(act==='run'){
+      const ok=Math.random() < 0.55 + (B.ally.spd-B.foe.spd)/100;
+      if(ok){ await say('무사히 도망쳤다!'); break; }
+      await say('도망칠 수 없었다!');
+    }
+    else if(act==='bag'){
+      const item=await pickFromList('가방', bagRowsBattle());
+      if(item===null||item===undefined) continue;
+      if(ITEMS[item].kind==='ball'){
+        if(await throwCapsule(item)) break;
+      } else {
+        if(B.ally.hp>=B.ally.maxHp){ await say('HP가 이미 가득하다!'); continue; }
+        G.bag[item]--; B.ally.hp=Math.min(B.ally.maxHp,B.ally.hp+ITEMS[item].amt);
+        sfx.heal(); refreshBoxes();
+        await say(`${nameOf(B.ally)}의 HP가 회복되었다!`);
+      }
+    }
+    else if(act==='party'){
+      const idx=await pickFromList('교체할 몬스터', partyRows(true));
+      if(idx===null||idx===undefined) continue;
+      await say(`돌아와, ${nameOf(B.ally)}!`);
+      B.ally=G.party[idx]; refreshBoxes();
+      await say(`가라! ${nameOf(B.ally)}!`);
+    }
+
+    // ----- 턴 진행 -----
+    const foeMove=B.foe.moves[Math.floor(Math.random()*B.foe.moves.length)];
+    const order=[];
+    if(allyMove) order.push(['ally',allyMove]);
+    order.push(['foe',foeMove]);
+    if(allyMove && B.ally.spd<B.foe.spd) order.reverse();
+    else if(allyMove && B.ally.spd===B.foe.spd && Math.random()<.5) order.reverse();
+
+    for(const [side,mv] of order){
+      if(side==='ally'){
+        await doMove(B.ally,B.foe,mv,true);
+        if(B.foe.hp<=0){
+          sfx.faint(); B.anim.eVisible=false;
+          await say(`야생 ${nameOf(B.foe)}이(가) 쓰러졌다!`);
+          await gainExp();
+          break battleLoop;
+        }
+      } else {
+        await doMove(B.foe,B.ally,mv,false);
+        if(B.ally.hp<=0){
+          sfx.faint(); refreshBoxes();
+          await say(`${nameOf(B.ally)}이(가) 쓰러졌다!`);
+          if(aliveParty().length===0){
+            await say('눈앞이 캄캄해졌다…');
+            await blackout(); break battleLoop;
+          }
+          const idx=await pickFromList('다음 몬스터를 보내자!', partyRows(true), false);
+          B.ally=G.party[idx]; refreshBoxes();
+          await say(`힘내라! ${nameOf(B.ally)}!`);
+          break; // 교체 후 이번 턴 종료
+        }
+      }
+    }
+  }
+  endBattle();
+}
+function endBattle(){
+  hide('ebox'); hide('pbox'); hide('msg'); $('actions').classList.remove('show'); $('moves').classList.remove('show');
+  bHandler=null;
+  if(G.state!=='title') G.state='world';
+}
+async function blackout(){
+  G.party.forEach(m=>{m.hp=m.maxHp;});
+  G.px=4; G.py=16; G.dir='down'; G.mx=0; G.my=0; G.moving=false;
+  await say('정신을 차려보니 몬스터 센터 앞이었다. 모두 회복되었다!');
+}
+</script>
+<script>
+"use strict";
+/* ---------- 일시정지 메뉴 ---------- */
+async function openPause(){
+  if(G.state!=='world') return;
+  G.state='dialog'; sfx.ok();
+  const choice=await pickFromList('메뉴', [
+    {label:'📦 내 몬스터', value:'mons'},
+    {label:'🎒 가방', value:'bag'},
+    {label:'📖 도감 보기', value:'dex'},
+    {label:'💾 저장 코드', value:'save'},
+  ]);
+  if(choice==='mons') await pauseParty();
+  else if(choice==='bag') await pauseBag();
+  else if(choice==='dex') await pauseDex();
+  else if(choice==='save') openSave();
+  if(G.state==='dialog') G.state='world';
+}
+async function pauseParty(){
+  while(true){
+    const idx=await pickFromList('내 몬스터 (선택 → 선두로)', partyRows(false));
+    if(idx===null||idx===undefined) return;
+    const m=G.party[idx];
+    const what=await pickFromList(`${nameOf(m)} Lv${m.lv}`, [
+      {label:'⬆ 선두로 보내기', value:'lead', disabled:m.hp<=0},
+      {label:`기술: ${m.moves.join(', ')}`, value:null, disabled:true},
+      {label:DEX[m.id].desc, value:null, disabled:true},
+    ]);
+    if(what==='lead'){ G.party.splice(idx,1); G.party.unshift(m); sfx.heal(); }
+  }
+}
+async function pauseBag(){
+  while(true){
+    const item=await pickFromList('가방', bagRowsBattle());
+    if(item===null||item===undefined) return;
+    if(ITEMS[item].kind==='heal'){
+      const idx=await pickFromList('누구에게 사용할까?', partyRows(false));
+      if(idx===null||idx===undefined) continue;
+      const m=G.party[idx];
+      if(m.hp<=0){ await dialog(['쓰러진 몬스터에게는 사용할 수 없다!']); continue; }
+      if(m.hp>=m.maxHp){ await dialog(['HP가 이미 가득하다!']); continue; }
+      G.bag[item]--; m.hp=Math.min(m.maxHp,m.hp+ITEMS[item].amt); sfx.heal();
+      await dialog([`${nameOf(m)}의 HP가 회복되었다!`]);
+    } else {
+      await dialog(['캡슐은 배틀 중에만 사용할 수 있다!']);
+    }
+  }
+}
+async function pauseDex(){
+  const seen=[...new Set(G.party.map(m=>m.id))];
+  const rows=Object.keys(DEX).map(id=>{
+    const known=seen.includes(id);
+    return {label: known?`${DEX[id].name} · ${DEX[id].type}타입`:'???',
+            sub: known?DEX[id].desc:'아직 만나지 못했다',
+            mon: known?{id,hp:1,maxHp:1}:null, value:null, disabled:true};
+  });
+  rows.push({label:'↩ 돌아가기', value:'back'});
+  await pickFromList(`도감 (${seen.length}/${Object.keys(DEX).length} 등록)`, rows);
+}
+
+/* ---------- 저장 코드 ---------- */
+function snapshot(){
+  return btoa(unescape(encodeURIComponent(JSON.stringify({
+    p:{x:G.px,y:G.py}, party:G.party, bag:G.bag, v:1
+  }))));
+}
+function loadSnapshot(code){
+  try{
+    const d=JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+    if(!d.party||!d.party.length) return false;
+    G.party=d.party; G.party.forEach(m=>calcStats(m)); // 안전 재계산(HP 유지)
+    G.party.forEach(m=>{ m.hp=Math.min(m.hp,m.maxHp); });
+    G.bag=d.bag||{capsule:5,potion:2,capsuleX:0};
+    G.px=d.p?.x??12; G.py=d.p?.y??17; G.mx=0;G.my=0;G.moving=false;
+    return true;
+  }catch(e){ return false; }
+}
+function openSave(fromTitle){
+  const S=$('saveui');
+  S.innerHTML = fromTitle
+    ? `<h3 style="font-size:12px;margin-bottom:6px">저장 코드 붙여넣기</h3>
+       <textarea id="saveTA" placeholder="여기에 코드를 붙여넣으세요"></textarea>
+       <div class="btns"><button id="svLoad">불러오기</button><button id="svClose">닫기</button></div>`
+    : `<h3 style="font-size:12px;margin-bottom:6px">💾 저장 코드 (복사해서 보관하세요)</h3>
+       <textarea id="saveTA" readonly>${snapshot()}</textarea>
+       <div class="btns"><button id="svCopy">복사</button><button id="svClose">닫기</button></div>
+       <p style="font-size:9px;color:#7a7460;margin-top:5px">다음에 타이틀 화면 → ‘저장 코드 불러오기’에 붙여넣으면 이어서 할 수 있어요.</p>`;
+  show('saveui');
+  $('svClose').onclick=()=>{ hide('saveui'); sfx.cancel(); if(!fromTitle) G.state='world'; };
+  if(fromTitle){
+    $('svLoad').onclick=()=>{
+      if(loadSnapshot($('saveTA').value)){ hide('saveui'); hide('title'); sfx.catchOk(); G.state='world'; }
+      else { $('saveTA').value=''; $('saveTA').placeholder='코드가 올바르지 않아요! 다시 붙여넣어 주세요.'; sfx.cancel(); }
+    };
+  } else {
+    $('svCopy').onclick=()=>{ $('saveTA').select(); try{document.execCommand('copy');}catch(e){} navigator.clipboard?.writeText($('saveTA').value); $('svCopy').textContent='복사됨!'; sfx.ok(); };
+  }
+}
+
+/* ---------- 타이틀 & 시작 흐름 ---------- */
+function buildTitle(){
+  const tm=$('titleMons');
+  ['bulkkori','bangulmong','saessakji'].forEach(id=>{
+    const c=document.createElement('canvas'); c.width=16;c.height=16;
+    c.getContext('2d').drawImage(SPR[id],0,0); tm.appendChild(c);
+  });
+  show('title');
+  $('btnNew').onclick=async()=>{
+    sfx.ok(); hide('title');
+    await dialog(['박사: 오, 잘 왔네! 새싹 마을에 온 걸 환영하네.',
+                  '이 세계에는 신비한 생물 「몬스터」가 살고 있지.',
+                  '자네의 첫 파트너를 선물하겠네!']);
+    pickStarter();
+  };
+  $('btnLoad').onclick=()=>{ sfx.ok(); openSave(true); };
+}
+function pickStarter(){
+  const box=$('starterOpts'); box.innerHTML='';
+  [['bulkkori','🔥 불타입'],['bangulmong','💧 물타입'],['saessakji','🌿 풀타입']].forEach(([id,sub])=>{
+    const b=document.createElement('button');
+    const c=document.createElement('canvas'); c.width=16;c.height=16;
+    c.getContext('2d').drawImage(SPR[id],0,0);
+    b.appendChild(c);
+    b.insertAdjacentHTML('beforeend',`${DEX[id].name}<br><small style="font-size:9px;color:#7a7460">${sub}</small>`);
+    b.onclick=async()=>{
+      sfx.catchOk(); hide('starter');
+      G.party=[makeMon(id,5)];
+      await dialog([`${DEX[id].name}을(를) 선택했다!`,
+                    DEX[id].desc,
+                    '박사: 좋은 선택이야! 캡슐 8개와 회복약 4개도 챙기게.',
+                    '북쪽 풀숲에 다양한 몬스터가 산다네.',
+                    '풀숲을 걸으면 야생 몬스터가 튀어나오니 조심하고…',
+                    '지치면 ♥ 표시가 있는 몬스터 센터 문 앞에서 A!',
+                    '자네만의 몬스터 도감을 완성해 보게! 행운을 비네!']);
+      G.state='world';
+    };
+    box.appendChild(b);
+  });
+  show('starter');
+}
+
+/* ---------- 부팅 ---------- */
+buildTitle();
+loop();
+</script>
+</body>
+</html>
