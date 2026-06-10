@@ -2,7 +2,12 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="몬스터 퀘스트">
+<meta name="theme-color" content="#22281f">
 <title>몬스터 퀘스트: 새싹 마을</title>
 <style>
 @font-face{
@@ -10,7 +15,8 @@
   src:url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/DungGeunMo.woff') format('woff');
   font-display:swap;
 }
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;touch-action:manipulation;}
+html{-webkit-text-size-adjust:100%;}
 :root{
   --shell:#e8e4d8; --shell-dk:#c9c4b2; --shell-line:#9a957f;
   --screen-bezel:#3a3f36; --accent:#d9534a; --accent-dk:#a93c35;
@@ -24,8 +30,12 @@ body{
   display:flex;align-items:center;justify-content:center;
   font-family:'DGM','Galmuri11',Pretendard,'Apple SD Gothic Neo',sans-serif;
   color:var(--ink);
-  min-height:100dvh; padding:10px;
+  min-height:100dvh;
+  padding:calc(6px + env(safe-area-inset-top)) 10px calc(6px + env(safe-area-inset-bottom));
+  position:fixed;inset:0;width:100%;
+  overflow:hidden;overscroll-behavior:none;
 }
+#console{transform-origin:center center;flex:none;}
 #console{
   width:min(96vw,460px);
   background:linear-gradient(160deg,#f1ede1,var(--shell) 40%,var(--shell-dk));
@@ -153,6 +163,9 @@ button.kfocus{background:#ffe9b3;outline:3px solid var(--accent);outline-offset:
 #bStart{font-size:9px;letter-spacing:1px;background:var(--shell-dk);border-radius:10px;padding:4px 16px;text-align:center;}
 #hint{font-size:9px;color:#8a8570;text-align:center;margin-top:10px;line-height:1.6;}
 @media(min-width:700px){ #pads{opacity:.92} }
+/* 게임 패드 버튼: 터치 시 스크롤/줌 제스처 완전 차단 */
+#dpad button,.round,#bStart,#msg{touch-action:none;}
+#pads,#startrow{-webkit-touch-callout:none;}
 </style>
 </head>
 <body>
@@ -1222,6 +1235,55 @@ function pickStarter(){
 }
 
 /* ---------- 부팅 ---------- */
+/* ---------- 모바일 최적화 ---------- */
+// 1) 콘솔이 화면보다 크면 자동 축소 (가로/세로 회전 대응)
+function fitConsole(){
+  const c=document.getElementById('console');
+  c.style.transform='';
+  const vv=window.visualViewport;
+  const vh=(vv?vv.height:innerHeight)-12, vw=(vv?vv.width:innerWidth)-12;
+  const r=Math.min(1, vh/c.offsetHeight, vw/c.offsetWidth);
+  if(r<1) c.style.transform=`scale(${r})`;
+}
+addEventListener('resize',fitConsole);
+addEventListener('orientationchange',()=>setTimeout(fitConsole,120));
+if(window.visualViewport) visualViewport.addEventListener('resize',fitConsole);
+setTimeout(fitConsole,80); setTimeout(fitConsole,600); // 폰트 로딩 후 재계산
+
+// 2) 핀치 줌 / 더블탭 확대 차단 (iOS 사파리 대응)
+document.addEventListener('gesturestart',e=>e.preventDefault());
+document.addEventListener('gesturechange',e=>e.preventDefault());
+let _lastTouch=0;
+document.addEventListener('touchend',e=>{
+  const n=Date.now();
+  if(n-_lastTouch<320) e.preventDefault(); // 더블탭 확대 방지
+  _lastTouch=n;
+},{passive:false});
+
+// 3) 홈 화면 추가 시 앱처럼 실행되도록 매니페스트/아이콘 동적 생성
+(function(){
+  try{
+    const cv=document.createElement('canvas'); cv.width=cv.height=192;
+    const x=cv.getContext('2d');
+    x.fillStyle='#22281f'; x.fillRect(0,0,192,192);
+    x.fillStyle='#e23b30'; x.beginPath(); x.arc(96,96,68,Math.PI,0); x.fill();
+    x.fillStyle='#f4f1e4'; x.beginPath(); x.arc(96,96,68,0,Math.PI); x.fill();
+    x.fillStyle='#2b2d2a'; x.fillRect(28,89,136,14);
+    x.beginPath(); x.arc(96,96,24,0,7); x.fill();
+    x.fillStyle='#f4f1e4'; x.beginPath(); x.arc(96,96,13,0,7); x.fill();
+    const icon=cv.toDataURL('image/png');
+    const li=document.createElement('link'); li.rel='apple-touch-icon'; li.href=icon;
+    document.head.appendChild(li);
+    const man={name:'몬스터 퀘스트: 새싹 마을',short_name:'몬스터퀘스트',
+      display:'standalone',orientation:'portrait',
+      background_color:'#22281f',theme_color:'#22281f',start_url:'.',
+      icons:[{src:icon,sizes:'192x192',type:'image/png'}]};
+    const lm=document.createElement('link'); lm.rel='manifest';
+    lm.href=URL.createObjectURL(new Blob([JSON.stringify(man)],{type:'application/json'}));
+    document.head.appendChild(lm);
+  }catch(e){}
+})();
+
 buildTitle();
 loop();
 </script>
